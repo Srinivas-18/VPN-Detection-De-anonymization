@@ -61,11 +61,12 @@ class RealIPDetector:
             ]
         }
     
-    def detect_real_ip_from_pcap(self, pcap_file: str) -> Dict:
+    def detect_real_ip_from_pcap(self, pcap_file: str, known_vpn_ips: list = None) -> Dict:
         """
         Main function to detect real IP from PCAP analysis
         Uses multiple detection techniques
         """
+        self.dynamic_vpn_ips = known_vpn_ips or []
         results = {
             'vpn_ips_detected': [],
             'potential_real_ips': [],
@@ -102,7 +103,7 @@ class RealIPDetector:
             # Method 4: VPN Provider Detection
             print("🔒 Identifying VPN providers...")
             vpn_results = self._identify_vpn_providers(packets)
-            results['vpn_ips_detected'] = vpn_results['vpn_ips']
+            results['vpn_ips_detected'] = list(set(vpn_results['vpn_ips'] + getattr(self, 'dynamic_vpn_ips', [])))
             results['detection_methods'].append('VPN Provider Identification')
             
             # Add X VPN IP if not detected by provider identification
@@ -382,6 +383,8 @@ class RealIPDetector:
     
     def _is_vpn_ip(self, ip: str) -> bool:
         """Check if IP belongs to known VPN ranges"""
+        if hasattr(self, 'dynamic_vpn_ips') and ip in self.dynamic_vpn_ips:
+            return True
         try:
             import ipaddress
             ip_obj = ipaddress.ip_address(ip)

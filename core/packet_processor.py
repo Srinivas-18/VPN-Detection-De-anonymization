@@ -74,18 +74,31 @@ def analyze_packet_details(pcap_path: str) -> Dict:
                             # Extract potential passwords and usernames from HTTP data
                             credential_patterns = {
                                 'password': [
-                                    r'password[=:]\s*([^\s&]+)',
-                                    r'passwd[=:]\s*([^\s&]+)',
-                                    r'pwd[=:]\s*([^\s&]+)',
-                                    r'pass[=:]\s*([^\s&]+)'
+                                    r'password[=:]\s*([^\s&",]+)',
+                                    r'passwd[=:]\s*([^\s&",]+)',
+                                    r'pwd[=:]\s*([^\s&",]+)',
+                                    r'pass[=:]\s*([^\s&",]+)',
+                                    r'"password"\s*:\s*"([^"]+)"',
+                                    r'"passwd"\s*:\s*"([^"]+)"',
+                                    r'"pwd"\s*:\s*"([^"]+)"',
+                                    r'"pass"\s*:\s*"([^"]+)"'
                                 ],
                                 'username': [
-                                    r'username[=:]\s*([^\s&]+)',
-                                    r'user[=:]\s*([^\s&]+)',
-                                    r'login[=:]\s*([^\s&]+)',
-                                    r'email[=:]\s*([^\s&]+)',
-                                    r'userid[=:]\s*([^\s&]+)',
-                                    r'account[=:]\s*([^\s&]+)'
+                                    r'username[=:]\s*([^\s&",]+)',
+                                    r'user_name[=:]\s*([^\s&",]+)',
+                                    r'user[=:]\s*([^\s&",]+)',
+                                    r'login[=:]\s*([^\s&",]+)',
+                                    r'email[=:]\s*([^\s&",]+)',
+                                    r'userid[=:]\s*([^\s&",]+)',
+                                    r'account[=:]\s*([^\s&",]+)',
+                                    r'uname[=:]\s*([^\s&",]+)',
+                                    r'uid[=:]\s*([^\s&",]+)',
+                                    r'id[=:]\s*([^\s&",]+)',
+                                    r'"username"\s*:\s*"([^"]+)"',
+                                    r'"user"\s*:\s*"([^"]+)"',
+                                    r'"login"\s*:\s*"([^"]+)"',
+                                    r'"email"\s*:\s*"([^"]+)"',
+                                    r'"userid"\s*:\s*"([^"]+)"'
                                 ]
                             }
                             
@@ -94,12 +107,14 @@ def analyze_packet_details(pcap_path: str) -> Dict:
                                     matches = re.findall(pattern, raw_data, re.IGNORECASE)
                                     for match in matches:
                                         if len(match) > 2:  # Filter out very short matches
+                                            # remove enclosing quotes if captured in form-urlencoded falsely
+                                            match = match.strip('"\'')
                                             analysis['potential_passwords'].append({
                                                 'type': 'HTTP',
                                                 'credential_type': cred_type,
                                                 'src_ip': src_ip,
                                                 'dst_ip': dst_ip,
-                                                'field': pattern.split('[')[0],
+                                                'field': re.sub(r'[^a-zA-Z0-9_]', '', pattern.split('[')[0].split('"')[0] if '"' not in pattern.split('[')[0] else pattern.split('"')[1]),
                                                 'value': match[:50]  # Truncate for security
                                             })
                 

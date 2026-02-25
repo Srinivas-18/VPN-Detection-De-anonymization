@@ -24,7 +24,10 @@ def save_full_report(
     deanonym_results=None,
     geo_data=None,
     mac_data=None,
-    payload_data=None
+    payload_data=None,
+    ai_analysis=None,
+    packet_analysis=None,
+    enhanced_analysis=None
 ):
     with open(filename, "w", newline="", encoding='utf-8') as f:
         writer = csv.writer(f)
@@ -104,6 +107,51 @@ def save_full_report(
         # Count unique MACs
         macs = set(data.get("MAC Address", "") for data in all_data.values() if data.get("MAC Address"))
         writer.writerow(["Unique MAC Addresses", len(macs)])
+        
+        # Add AI Analysis section if available
+        if ai_analysis:
+            writer.writerow([])
+            writer.writerow(["=== AI THREAT ANALYSIS ==="])
+            if "network_analysis" in ai_analysis:
+                network_data = ai_analysis["network_analysis"]
+                network_str = str(network_data) if not isinstance(network_data, dict) else ", ".join([f"{k}: {v}" for k, v in network_data.items()])
+                writer.writerow(["Network Analysis", network_str[:500]])
+            if "payload_analysis" in ai_analysis:
+                payload_data = ai_analysis["payload_analysis"]
+                payload_str = str(payload_data) if not isinstance(payload_data, dict) else ", ".join([f"{k}: {v}" for k, v in payload_data.items()])
+                writer.writerow(["Payload Analysis", payload_str[:500]])
+            if "threat_report" in ai_analysis:
+                threat_data = ai_analysis["threat_report"]
+                threat_str = str(threat_data) if not isinstance(threat_data, dict) else ", ".join([f"{k}: {v}" for k, v in threat_data.items()])
+                writer.writerow(["Threat Report", threat_str[:500]])
+        
+        # Add Packet Analysis section if available
+        if packet_analysis:
+            writer.writerow([])
+            writer.writerow(["=== PACKET ANALYSIS ==="])
+            writer.writerow(["Total Protocols", len(packet_analysis.get("protocols", {}))])
+            writer.writerow(["Websites Accessed", len(packet_analysis.get("websites", []))])
+            writer.writerow(["Suspicious Activity", "Yes" if packet_analysis.get("suspicious_activity") else "No"])
+        
+        # Add Enhanced Analysis section if available
+        if enhanced_analysis:
+            writer.writerow([])
+            writer.writerow(["=== ENHANCED DE-ANONYMIZATION ==="])
+            if "real_ip_detection" in enhanced_analysis:
+                real_ip = enhanced_analysis["real_ip_detection"]
+                potential_ips = real_ip.get("potential_real_ips", [])
+                ips_str = ", ".join(map(str, potential_ips)) if potential_ips else "None detected"
+                writer.writerow(["Potential Real IPs", ips_str])
+            if "dns_leaks" in enhanced_analysis:
+                dns = enhanced_analysis["dns_leaks"]
+                detected_leaks = dns.get("detected_leaks", [])
+                leaks_count = len(detected_leaks) if isinstance(detected_leaks, list) else 0
+                writer.writerow(["DNS Leaks Detected", str(leaks_count)])
+            if "encrypted_traffic" in enhanced_analysis:
+                enc = enhanced_analysis["encrypted_traffic"]
+                stats = enc.get("statistics", {})
+                total_encrypted = stats.get("total_encrypted_packets", 0) if isinstance(stats, dict) else 0
+                writer.writerow(["Encrypted Packets", str(total_encrypted)])
 
 def save_comprehensive_excel_report(
     filename: str,
@@ -557,11 +605,16 @@ def save_comprehensive_excel_report(
             row += 2
             enhanced_sheet.cell(row=row, column=1, value="Website Fingerprinting (Through Encrypted HTTPS):").font = Font(bold=True)
             row += 1
-            websites = encrypted_results['website_fingerprinting']
+            websites = encrypted_results['website_fingerprinting'].get('potential_websites', {})
             for site, confidence in websites.items():
-                enhanced_sheet.cell(row=row, column=1, value=f"  {site}")
-                enhanced_sheet.cell(row=row, column=2, value=f"{confidence:.1%} confidence")
-                row += 1
+                if isinstance(confidence, (int, float)):
+                    enhanced_sheet.cell(row=row, column=1, value=f"  {site}")
+                    enhanced_sheet.cell(row=row, column=2, value=f"{confidence:.1%} confidence")
+                    row += 1
+                else:
+                    enhanced_sheet.cell(row=row, column=1, value=f"  {site}")
+                    enhanced_sheet.cell(row=row, column=2, value=str(confidence))
+                    row += 1
         
         # Advanced Fingerprinting
         row += 2

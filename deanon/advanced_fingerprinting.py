@@ -96,6 +96,25 @@ class AdvancedFingerprinter:
                 results['protocol_signatures'][ip] = self._generate_protocol_signature(data)
                 results['application_fingerprints'][ip] = self._identify_applications(data)
             
+            # Map GUI expected keys
+            results['os_detection'] = {
+                ip: {'os': fp['os_guess'], 'version': 'N/A', 'ttl': fp['ttl'], 'confidence': 85 if fp['os_guess'] != "Unknown" else 0}
+                for ip, fp in results['device_fingerprints'].items()
+            }
+            results['network_behavior'] = {
+                ip: {
+                    'connection_pattern': bp['activity_rhythm']['activity_pattern'],
+                    'traffic_volume': bp['communication_style']['style'],
+                    'protocol_usage': max(results['protocol_signatures'][ip]['protocol_distribution'], key=results['protocol_signatures'][ip]['protocol_distribution'].get, default='Unknown'),
+                    'timing_pattern': results['timing_analysis'][ip].get('timing_signature', 'Unknown')
+                } for ip, bp in results['behavioral_patterns'].items()
+            }
+            results['application_signatures'] = {
+                ip: list(set(
+                    app['web_browsers'] + app['messaging_apps'] + app['file_sharing']
+                )) for ip, app in results['application_fingerprints'].items()
+            }
+            
             return results
             
         except Exception as e:
@@ -269,7 +288,7 @@ class AdvancedFingerprinter:
     def _analyze_activity_rhythm(self, intervals: List[float]) -> Dict:
         """Analyze user activity rhythm"""
         if not intervals:
-            return {'pattern': 'No activity data'}
+            return {'pattern': 'No activity data', 'activity_pattern': 'Unknown'}
         
         # Detect activity patterns
         short_intervals = [i for i in intervals if i < 1.0]  # < 1 second

@@ -84,6 +84,21 @@ def launch_gui():
             return
 
         try:
+            # Get AI analysis data if available
+            ai_analysis = None
+            if hasattr(app, "ai_analysis_results"):
+                ai_analysis = app.ai_analysis_results
+            
+            # Get packet analysis data if available
+            packet_analysis = None
+            if hasattr(app, "packet_analysis_results"):
+                packet_analysis = app.packet_analysis_results
+            
+            # Get enhanced analysis data if available
+            enhanced_analysis = None
+            if hasattr(app, "enhanced_analysis"):
+                enhanced_analysis = app.enhanced_analysis
+            
             save_full_report(
                 file_path,
                 app.results,
@@ -96,9 +111,11 @@ def launch_gui():
                     "isp": data.get("ISP", "")
                 } for ip, data in app.full_analysis.items() if any(k in data for k in ["Country", "City", "ISP"])},
                 mac_data={ip: data.get("MAC") for ip, data in app.full_analysis.items() if "MAC" in data},
-                payload_data={ip: str(data.get("Payload", "")) for ip, data in app.full_analysis.items() if "Payload" in data}
+                payload_data={ip: str(data.get("Payload", "")) for ip, data in app.full_analysis.items() if "Payload" in data},
+                ai_analysis=ai_analysis,
+                packet_analysis=packet_analysis,
+                enhanced_analysis=enhanced_analysis
             )
-
 
             messagebox.showinfo("Saved", f"Full report saved to {file_path}")
         except Exception as e:
@@ -335,6 +352,8 @@ def launch_gui():
             def worker():
                 try:
                     # Initialize enhanced analyzers
+                    app.after(0, lambda: progress_label.config(text="🔐 Initializing analyzers..."))
+                    
                     encrypted_analyzer = EncryptedTrafficAnalyzer()
                     dns_detector = DNSLeakDetector()
                     real_ip_detector = RealIPDetector()
@@ -347,7 +366,8 @@ def launch_gui():
                     dns_results = dns_detector.detect_dns_leaks(app.file_path)
                     
                     app.after(0, lambda: progress_label.config(text="🔍 Detecting real IP addresses..."))
-                    real_ip_results = real_ip_detector.detect_real_ip_from_pcap(app.file_path)
+                    known_vpn_ips = [ip for ip, is_vpn in getattr(app, 'results', []) if is_vpn]
+                    real_ip_results = real_ip_detector.detect_real_ip_from_pcap(app.file_path, known_vpn_ips=known_vpn_ips)
                     
                     app.after(0, lambda: progress_label.config(text="🔬 Advanced device fingerprinting..."))
                     
@@ -403,7 +423,13 @@ def launch_gui():
                     app.after(0, lambda: show_enhanced_analysis_popup(app.enhanced_analysis))
                     
                 except Exception as e:
-                    app.after(0, lambda: progress_label.config(text=f"❌ Enhanced analysis failed: {str(e)}"))
+                    import traceback
+                    error_msg = f"❌ Enhanced analysis failed: {str(e)}"
+                    print(f"Enhanced De-anonymization Error: {str(e)}")
+                    print(traceback.format_exc())
+                    app.after(0, lambda msg=error_msg: progress_label.config(text=msg))
+                    app.after(0, lambda: messagebox.showerror("Enhanced Analysis Error", 
+                        f"Enhanced de-anonymization failed:\n{str(e)}\n\nCheck console for details."))
             
             threading.Thread(target=worker, daemon=True).start()
 
@@ -437,10 +463,16 @@ def launch_gui():
                     if hasattr(app, "enhanced_analysis") and app.enhanced_analysis:
                         combined_analysis["enhanced_deanonymization"] = app.enhanced_analysis
                     
-                    # Get payload data if available
+                    # Get payload data directly from payload_inspector if possible
                     payload_data = {}
+                    try:
+                        import deanon.payload_inspector as payload_inspector
+                        payload_data = payload_inspector.extract_payloads(app.file_path)
+                    except Exception as e:
+                        print(f"Failed to extract payloads directly for AI: {e}")
+                        
                     for ip, data in combined_analysis.items():
-                        if isinstance(data, dict) and "Payload" in data:
+                        if isinstance(data, dict) and "Payload" in data and ip not in payload_data:
                             payload_data[ip] = data["Payload"]
                     
                     # Run AI analysis
@@ -465,7 +497,28 @@ def launch_gui():
                     app.after(0, lambda: show_ai_analysis_popup(network_analysis, payload_analysis, threat_report))
                     
                 except Exception as e:
-                    app.after(0, lambda: progress_label.config(text=f"❌ AI analysis failed: {str(e)}"))
+                    import traceback
+                    error_str = str(e)
+                    error_msg = f"❌ AI analysis failed: {error_str}"
+                    print(f"AI Analysis Error: {error_str}")
+                    print(traceback.format_exc())
+                    app.after(0, lambda msg=error_msg: progress_label.config(text=msg))
+                    
+                    # Special handling for leaked API key
+                    if "403" in error_str or "leaked" in error_str.lower():
+                        app.after(0, lambda: messagebox.showerror(
+                            "🔑 API Key Compromised",
+                            "Your Gemini API key has been reported as leaked and disabled.\n\n"
+                            "To fix this:\n"
+                            "1. Visit: https://makersuite.google.com/app/apikey\n"
+                            "2. Create a new API key\n"
+                            "3. Update GEMINI_API_KEY in your .env file\n"
+                            "4. Restart the application\n\n"
+                            "IMPORTANT: Never commit .env file to version control!"
+                        ))
+                    else:
+                        app.after(0, lambda: messagebox.showerror("AI Analysis Error", 
+                            f"AI threat analysis failed:\n{error_str}\n\nCheck console for details."))
             
             threading.Thread(target=worker, daemon=True).start()
 
@@ -477,23 +530,38 @@ def launch_gui():
         
         # Add AI Analysis button if API key is available
         try:
-            ai_analyzer = get_ai_analyzer()
-            if ai_analyzer:
-                ai_button = tk.Button(popup, text="🤖 AI Threat Analysis", command=lambda: run_ai_analysis(ai_analyzer), 
-                                    bg="#ff6b35", fg="white", width=25, font=("Arial", 10, "bold"))
-                ai_button.pack(pady=10)
-                print("✅ AI Threat Analysis button created and packed")
+            # Force reload Config from environment variables to pick up changes
+            from dotenv import load_dotenv; load_dotenv(override=True)
+            import importlib; import config; importlib.reload(config)
+            from config import Config
+            if Config.is_ai_enabled():
+                ai_analyzer = get_ai_analyzer(Config.GEMINI_API_KEY)
+                if ai_analyzer:
+                    ai_button = tk.Button(popup, text="🤖 AI Threat Analysis", command=lambda: run_ai_analysis(ai_analyzer), 
+                                        bg="#ff6b35", fg="white", width=25, font=("Arial", 10, "bold"))
+                    ai_button.pack(pady=10)
+                    print("✅ AI Threat Analysis button created")
+                else:
+                    print("⚠️ AI Analyzer initialization returned None")
+                    placeholder_button = tk.Button(popup, text="⚠️ AI Setup Issue", 
+                                                 bg="#666666", fg="white", width=25, state="disabled")
+                    placeholder_button.pack(pady=10)
             else:
-                print("❌ AI Analyzer is None - button not added")
-                # Add a placeholder button to show the issue
-                placeholder_button = tk.Button(popup, text="❌ AI Not Available", 
-                                             bg="#666666", fg="white", width=25, state="disabled")
-                placeholder_button.pack(pady=10)
+                print("ℹ️ AI features disabled - GEMINI_API_KEY not set")
+                info_button = tk.Button(popup, text="ℹ️ AI Not Configured", 
+                                       command=lambda: messagebox.showinfo("AI Configuration", 
+                                           "AI features require GEMINI_API_KEY in .env file\n"
+                                           "Please add your Gemini API key to enable AI analysis."),
+                                       bg="#666666", fg="white", width=25)
+                info_button.pack(pady=10)
         except Exception as e:
-            print(f"❌ Error getting AI analyzer: {e}")
-            # Add error button for debugging
+            import traceback
+            error_details = traceback.format_exc()
+            print(f"❌ Error initializing AI analyzer: {e}")
+            print(error_details)
             error_button = tk.Button(popup, text="🤖 AI Error (Click for details)", 
-                                   command=lambda: messagebox.showerror("AI Error", str(e)), 
+                                   command=lambda: messagebox.showerror("AI Initialization Error", 
+                                       f"Failed to initialize AI analyzer:\n{str(e)}\n\nSee console for details."),
                                    bg="#cc0000", fg="white", width=25)
             error_button.pack(pady=10)
 

@@ -13,17 +13,20 @@ class AIAnalyzer:
         
         # Configure Gemini
         genai.configure(api_key=self.api_key)
-        # Try different model names that might be available
+        # Try different model names that might be available (updated for Gemini 2.x)
         try:
-            self.model = genai.GenerativeModel('gemini-1.5-flash')
+            self.model = genai.GenerativeModel('gemini-2.5-flash')
         except Exception:
             try:
-                self.model = genai.GenerativeModel('gemini-1.5-pro')
+                self.model = genai.GenerativeModel('gemini-2.0-flash')
             except Exception:
                 try:
-                    self.model = genai.GenerativeModel('gemini-pro')
-                except Exception as e:
-                    raise ValueError(f"Could not initialize any Gemini model. Error: {str(e)}")
+                    self.model = genai.GenerativeModel('gemini-2.0-flash-exp')
+                except Exception:
+                    try:
+                        self.model = genai.GenerativeModel('gemini-pro')
+                    except Exception as e:
+                        raise ValueError(f"Could not initialize any Gemini model. Error: {str(e)}")
     
     def _extract_json_from_response(self, response_text: str) -> Dict:
         """Extract JSON from AI response, handling various response formats"""
@@ -113,7 +116,15 @@ class AIAnalyzer:
             return self._extract_json_from_response(response.text)
             
         except Exception as e:
-            return {"error": f"AI analysis failed: {str(e)}"}
+            error_msg = str(e)
+            if "403" in error_msg or "leaked" in error_msg.lower():
+                return {
+                    "error": "API Key Compromised",
+                    "message": "Your Gemini API key was reported as leaked and has been disabled.",
+                    "solution": "Please get a new API key from https://makersuite.google.com/app/apikey",
+                    "instructions": "1. Visit the URL above\n2. Create a new API key\n3. Update GEMINI_API_KEY in your .env file\n4. Restart the application"
+                }
+            return {"error": f"AI analysis failed: {error_msg}"}
     
     def analyze_network_behavior(self, analysis_data: Dict) -> Dict[str, str]:
         """Analyze overall network behavior and patterns"""
@@ -157,7 +168,23 @@ class AIAnalyzer:
             return self._extract_json_from_response(response.text)
             
         except Exception as e:
-            return {"error": f"Network behavior analysis failed: {str(e)}"}
+            error_msg = str(e)
+            if "403" in error_msg or "leaked" in error_msg.lower():
+                return {
+                    "error": "API Key Compromised",
+                    "message": "Your Gemini API key was reported as leaked and has been disabled.",
+                    "solution": "Please get a new API key from https://makersuite.google.com/app/apikey",
+                    "instructions": "1. Visit the URL above\n2. Create a new API key\n3. Update GEMINI_API_KEY in your .env file\n4. Restart the application"
+                }
+            return {"error": f"Threat report generation failed: {error_msg}"}
+            if "403" in error_msg or "leaked" in error_msg.lower():
+                return {
+                    "error": "API Key Compromised",
+                    "message": "Your Gemini API key was reported as leaked and has been disabled.",
+                    "solution": "Please get a new API key from https://makersuite.google.com/app/apikey",
+                    "instructions": "1. Visit the URL above\n2. Create a new API key\n3. Update GEMINI_API_KEY in your .env file\n4. Restart the application"
+                }
+            return {"error": f"Network behavior analysis failed: {error_msg}"}
     
     def generate_threat_report(self, analysis_data: Dict, payload_data: Dict) -> str:
         """Generate comprehensive threat report using AI"""

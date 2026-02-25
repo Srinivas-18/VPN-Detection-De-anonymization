@@ -1,4 +1,4 @@
-# 🛡️ VPN Detection & De-anonymization Tool - Complete A-Z Documentation
+# 🛡️ A PRACTICAL PYTHON-BASED FRAMEWORK FOR VPN DETECTION AND DE-ANONYMIZATION IN ENCRYPTED NETWORK TRAFFIC
 
 ## 📋 **Project Summary**
 
@@ -664,6 +664,12 @@ class EncryptedTrafficAnalyzer:
     INCLUDE_AI_ANALYSIS: bool = True
 ```
 
+### **🌟 Recent Enhancements**
+- **Dynamic API Key Reloading**: Updates to the `.env` file (like adding a Gemini API key) are hot-loaded in real-time, requiring no application restart.
+- **Robust Feature Parsing**: Implemented robust fallback dictionaries for incomplete pattern sequences in Advanced Fingerprinting to prevent runtime crashes.
+- **Precise AI Payload Extraction**: The AI Threat Analysis engine now directly invokes `payload_inspector`, maximizing threat identification by feeding raw payload bytes directly into the language model.
+- **Comprehensive Excel Reports**: Enhanced multi-sheet `.xlsx` exporting logic automatically standardizes dynamically extracted dicts (e.g. website confidence percentages) for crash-free reporting.
+
 ### **Environment Integration**
 - Environment variable support
 - Fallback configuration
@@ -736,8 +742,8 @@ Minimum 4GB RAM (8GB recommended)
 ### **⚡ Quick Installation**
 ```bash
 # Clone the repository
-git clone https://github.com/your-repo/vpn-detection-tool.git
-cd vpn-detection-tool
+git clone https://github.com/Srinivas-18/VPN-Detection-De-anonymization.git
+cd VPN-Detection-De-anonymization
 
 # Install dependencies
 pip install -r requirements.txt
@@ -842,8 +848,8 @@ export DEBUG_MODE=true
 ### **🔧 Development Setup**
 ```bash
 # Development installation
-git clone https://github.com/your-repo/vpn-detection-tool.git
-cd vpn-detection-tool
+git clone https://github.com/Srinivas-18/VPN-Detection-De-anonymization.git
+cd VPN-Detection-De-anonymization
 
 # Create virtual environment
 python -m venv venv
@@ -931,7 +937,7 @@ The developers assume no liability for misuse of this software.
 
 ### **📧 Contact Details**
 - **Email**: security@yourproject.com
-- **GitHub**: https://github.com/your-repo/vpn-detection-tool
+- **GitHub**: https://github.com/Srinivas-18/VPN-Detection-De-anonymization
 - **Website**: https://yourproject.com
 - **Documentation**: https://docs.yourproject.com
 
@@ -1027,8 +1033,8 @@ The developers assume no liability for misuse of this software.
 ### **Installation**
 ```bash
 # Clone the repository
-git clone <repository-url>
-cd "testing purpose 2.0"
+git clone https://github.com/Srinivas-18/VPN-Detection-De-anonymization.git
+cd VPN-Detection-De-anonymization
 
 # Install dependencies
 pip install -r requirements.txt
